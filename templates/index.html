@@ -1,0 +1,405 @@
+ <!DOCTYPE html>
+ <html lang="en">
+ <head>
+     <meta charset="UTF-8">
+     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+     <title>Q.Buddy Chatbot</title>
+     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+     <style>
+         body {
+             font-family: Arial, sans-serif;
+             background-color: #f4f4f9;
+             margin: 0;
+             padding: 0;
+             display: flex;
+             justify-content: center;
+             align-items: center;
+             min-height: 100vh;
+         }
+         #chat-container {
+             width: 400px;
+             height: 600px;
+             background: #fff;
+             border-radius: 10px;
+             box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+             display: flex;
+             flex-direction: column;
+             overflow: hidden;
+         }
+         #chat-box {
+             flex: 1;
+             overflow-y: auto;
+             padding: 20px;
+             background-color: #f9f9f9;
+         }
+         .chat-message {
+             margin-bottom: 10px;
+             padding: 10px;
+             border-radius: 10px;
+             max-width: 80%;
+         }
+         .user-message {
+             background-color: #e6f7ff;
+             color: #00529B;
+             align-self: flex-end;
+             margin-left: auto;
+         }
+         .bot-message {
+             background-color: #e9ffe6;
+             color: #4F8A10;
+             align-self: flex-start;
+         }
+         #input-section {
+             padding: 20px;
+             border-top: 1px solid #ddd;
+             background-color: #fff;
+         }
+         #input-options {
+             margin-bottom: 10px;
+         }
+         #input-options select {
+             width: 100%;
+             padding: 5px;
+             border-radius: 5px;
+             border: 1px solid #ddd;
+         }
+         #text_input_section, #audio_input_section, #file_input_section, #mic_input_section {
+             margin-bottom: 10px;
+         }
+         #text_input {
+             width: 100%;
+             padding: 10px;
+             border-radius: 5px;
+             border: 1px solid #ddd;
+             resize: none;
+         }
+         input[type="file"] {
+             width: 100%;
+         }
+         #send-button, #start-recording, #stop-recording {
+             width: 100%;
+             padding: 10px;
+             background-color: #00529B;
+             color: white;
+             border: none;
+             border-radius: 5px;
+             cursor: pointer;
+         }
+         #send-button:hover, #start-recording:hover, #stop-recording:hover {
+             background-color: #0072E5;
+         }
+         #processing-indicator {
+             display: none;
+             text-align: center;
+             color: #00529B;
+             font-style: italic;
+             margin-top: 10px;
+         }
+         #audio-feedback {
+             display: none;
+             margin-top: 10px;
+             text-align: center;
+         }
+         #audio-feedback audio {
+             width: 100%;
+         }
+         #replay-audio {
+             margin-top: 5px;
+             padding: 5px 10px;
+             background-color: #4F8A10;
+             color: white;
+             border: none;
+             border-radius: 5px;
+             cursor: pointer;
+         }
+         #replay-audio:hover {
+             background-color: #45a049;
+         }
+         #feedback-checkbox {
+             margin-top: 10px;
+             display: flex;
+             align-items: center;
+         }
+         #feedback-checkbox input {
+             margin-right: 5px;
+         }
+     </style>
+ </head>
+ <body>
+     <div id="chat-container">
+         <h2 style="text-align: center; padding: 10px; margin: 0; background-color: #00529B; color: white;">Q.Buddy</h2>
+ 
+         <div id="chat-box">
+             <!-- Conversation messages will appear here -->
+         </div>
+ 
+         <div id="processing-indicator">Processing your input...</div>
+ 
+         <div id="audio-feedback">
+             <audio id="feedback-audio" controls>
+                 Your browser does not support the audio element.
+             </audio>
+             <button id="replay-audio">Replay Audio</button>
+         </div>
+ 
+         <div id="input-section">
+             <div id="input-options">
+                 <select name="input_type" id="input_type">
+                     <option value="text">Text</option>
+                     <option value="audio">Audio File</option>
+                     <option value="file">Non-Audio File</option>
+                     <option value="mic">Microphone</option>
+                 </select>
+             </div>
+ 
+             <div id="text_input_section">
+                 <textarea id="text_input" rows="2" placeholder="Type your message..."></textarea>
+             </div>
+ 
+             <div id="audio_input_section" style="display:none;">
+                 <input type="file" name="audio_input" id="audio_input" accept="audio/*">
+             </div>
+ 
+             <div id="file_input_section" style="display:none;">
+                 <input type="file" name="file_input" id="file_input" accept=".txt,.pdf,.doc,.docx,.rtf">
+             </div>
+ 
+             <div id="mic_input_section" style="display:none;">
+                 <button type="button" id="start-recording">Start Recording</button>
+                 <button type="button" id="stop-recording" style="display:none;">Stop Recording</button>
+             </div>
+ 
+             <div id="feedback-checkbox">
+                 <input type="checkbox" id="request_feedback" name="request_feedback">
+                 <label for="request_feedback">Request feedback for this input</label>
+             </div>
+ 
+             <button id="send-button">Send</button>
+         </div>
+     </div>
+ 
+     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+     <script>
+         $(document).ready(function() {
+             let recognition;
+             let isRecording = false;
+ 
+             if ('webkitSpeechRecognition' in window) {
+                 recognition = new webkitSpeechRecognition();
+                 recognition.continuous = true;
+                 recognition.interimResults = true;
+                 recognition.lang = "en-US";
+ 
+                 let finalTranscript = '';
+ 
+                 recognition.onresult = function(event) {
+                     let interimTranscript = '';
+                     for (let i = event.resultIndex; i < event.results.length; ++i) {
+                         if (event.results[i].isFinal) {
+                             finalTranscript += event.results[i][0].transcript + ' ';
+                         } else {
+                             interimTranscript += event.results[i][0].transcript;
+                         }
+                     }
+                     $('#text_input').val(finalTranscript + interimTranscript);
+                 };
+ 
+                 recognition.onerror = function(event) {
+                     alert("Error occurred in speech recognition: " + event.error);
+                 };
+ 
+                 recognition.onend = function() {
+                     if (isRecording) {
+                         recognition.start();
+                     }
+                 };
+             }
+ 
+             function displayInitialGreeting() {
+                 $.ajax({
+                     url: '/get_greeting',
+                     type: 'GET',
+                     success: function(response) {
+                         appendBotMessage(response.greeting);
+                     },
+                     error: function(xhr) {
+                         console.error("Error getting initial greeting:", xhr.responseText);
+                     }
+                 });
+             }
+ 
+             // Call the function when the page loads
+             displayInitialGreeting();
+ 
+             $('#input_type').change(function() {
+                 const inputType = $(this).val();
+                 $('#text_input_section, #audio_input_section, #file_input_section, #mic_input_section').hide();
+                 $('#text_input').val(''); // Clear input field when switching input type
+                 if (inputType === 'audio') {
+                     $('#audio_input_section').show();
+                 } else if (inputType === 'file') {
+                     $('#file_input_section').show();
+                 } else if (inputType === 'mic') {
+                     $('#text_input_section, #mic_input_section').show();
+                 } else if (inputType === 'text') {
+                     $('#text_input_section').show();
+                 }
+             });
+ 
+             $('#send-button').on('click', function() {
+                 const inputType = $('#input_type').val();
+                 let inputContent = '';
+                 let isValid = true;
+ 
+                 switch(inputType) {
+                     case 'text':
+                         inputContent = $('#text_input').val().trim();
+                         if (inputContent === '') {
+                             alert("Please enter some text.");
+                             isValid = false;
+                         }
+                         break;
+                     case 'audio':
+                         const audioFile = $('#audio_input')[0].files[0];
+                         if (audioFile) {
+                             inputContent = "Audio file: " + audioFile.name;
+                         } else {
+                             alert("Please select an audio file.");
+                             isValid = false;
+                         }
+                         break;
+                     case 'file':
+                         const file = $('#file_input')[0].files[0];
+                         if (file) {
+                             inputContent = "File: " + file.name;
+                         } else {
+                             alert("Please select a file.");
+                             isValid = false;
+                         }
+                         break;
+                     case 'mic':
+                         inputContent = $('#text_input').val().trim();
+                         if (inputContent === '') {
+                             alert("Please record some audio.");
+                             isValid = false;
+                         }
+                         break;
+                 }
+ 
+                 if (isValid) {
+                     processInput(inputContent, inputType);
+                     appendUserMessage(inputContent);
+                     $('#text_input').val(''); // Clear text input field
+                 }
+             });
+ 
+             $('#start-recording').click(function() {
+                 if (recognition) {
+                     recognition.start();
+                     isRecording = true;
+                     $(this).hide();
+                     $('#stop-recording').show();
+                     $('#text_input').val(''); // Clear previous input
+                     finalTranscript = ''; // Reset finalTranscript
+                 }
+             });
+ 
+             $('#stop-recording').click(function() {
+                 if (recognition) {
+                     recognition.stop();
+                     isRecording = false;
+                     $(this).hide();
+                     $('#start-recording').show();
+                 }
+             });
+ 
+             function appendUserMessage(message) {
+                 $('#chat-box').append('<div class="chat-message user-message">' + message + '</div>');
+                 $('#chat-box').scrollTop($('#chat-box')[0].scrollHeight);
+             }
+ 
+             function appendBotMessage(message) {
+                 $('#chat-box').append('<div class="chat-message bot-message">' + message + '</div>');
+                 $('#chat-box').scrollTop($('#chat-box')[0].scrollHeight);
+             }
+ 
+             function processInput(inputContent, inputType) {
+                 $('#processing-indicator').show(); // Show processing indicator
+ 
+                 let formData = new FormData();
+                 formData.append('input_type', inputType);
+                 formData.append('is_feedback_request', $('#request_feedback').is(':checked'));
+ 
+                 if (inputType === 'text' || inputType === 'mic') {
+                     formData.append('text_input', inputContent);
+                 } else if (inputType === 'audio') {
+                     const audioFile = $('#audio_input')[0].files[0];
+                     formData.append('audio_input', audioFile);
+                 } else if (inputType === 'file') {
+                     const file = $('#file_input')[0].files[0];
+                     formData.append('file_input', file);
+                 }
+ 
+                 $.ajax({
+                     url: '/process',
+                     type: 'POST',
+                     data: formData,
+                     contentType: false,
+                     processData: false,
+                     success: function(response) {
+                         $('#processing-indicator').hide(); // Hide processing indicator
+                         if (response.error) {
+                             appendBotMessage("Error: " + response.error);
+                         } else {
+                             appendBotMessage(response.result);
+                             if (response.is_feedback_request) {
+                                 appendBotMessage("Original: " + response.original_text);
+                                 appendBotMessage("Corrected: " + response.result);
+                                 appendDetailedFeedback(response.feedback);
+                                 if (response.pronunciation_issues && response.pronunciation_issues.length > 0) {
+                                     appendPronunciationIssues(response.pronunciation_issues);
+                                 }
+                                 if (response.audio_feedback_path) {
+                                     displayAudioFeedback(response.audio_feedback_path);
+                                 }
+                             }
+                         }
+                     },
+                     error: function(xhr) {
+                         $('#processing-indicator').hide(); // Hide processing indicator
+                         appendBotMessage("Error: " + (xhr.responseJSON ? xhr.responseJSON.error : "Unknown error occurred"));
+                     }
+                 });
+             }
+ 
+             function appendDetailedFeedback(feedback) {
+                 if (feedback && feedback.length > 0) {
+                     feedback.forEach(function(item) {
+                         $('#chat-box').append('<div class="chat-message bot-message"><strong>Feedback:</strong> ' + item.message +
+                         '<br><strong>Incorrect:</strong> ' + item.incorrect +
+                         '<br><strong>Correct:</strong> ' + (item.correct_statement || item.suggestions[0] || 'No suggestion available') + '</div>');
+                     });
+                 }
+             }
+ 
+             function appendPronunciationIssues(issues) {
+                 if (issues && issues.length > 0) {
+                     $('#chat-box').append('<div class="chat-message bot-message"><strong>Pronunciation Issues:</strong> ' + issues.join(', ') + '</div>');
+                 }
+             }
+ 
+             function displayAudioFeedback(audioPath) {
+                 $('#feedback-audio').attr('src', '/audio_feedback/' + audioPath);
+                 $('#audio-feedback').show();
+             }
+ 
+             $('#replay-audio').click(function() {
+                 $('#feedback-audio')[0].play();
+             });
+ 
+             // Initially show only the text input section
+             $('#text_input_section').show();
+         });
+     </script>
+ </body>
+ </html>
