@@ -1,4 +1,4 @@
-## Install following packages
+## Install following packages by using the command "pip install -r requirements.txt" in gitbash
 
 Flask==2.0.3
 werkzeug==2.0.3
