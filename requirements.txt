@@ -1,0 +1,9 @@
+Flask==2.0.3
+werkzeug==2.0.3
+textract==1.6.5
+transformers==4.11.3
+speechrecognition==3.8.1
+gtts==2.2.3
+language_tool_python==2.7.0
+pydub==0.25.1
+pronouncing==0.2.0
